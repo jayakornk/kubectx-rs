@@ -2,11 +2,17 @@
 //
 // If fzf is available and stdout is a terminal, kubectx uses it to present
 // an interactive fuzzy-search menu.
+//
+// fzf is opened immediately and items are streamed to its stdin from a
+// background thread, so the user can start typing/searching while data
+// is still loading (e.g. `kubectl get namespaces` over the network).
 
 #![allow(dead_code)]
 
 use std::io::Write;
 use std::process::{Command, Stdio};
+
+use colored::Colorize;
 
 /// Check if fzf is available in PATH and not disabled via env.
 pub fn fzf_available() -> bool {
@@ -36,11 +42,23 @@ fn which_fzf() -> Option<String> {
     }
 }
 
-/// Present items via fzf and return the selected one.
-/// Returns None if user cancelled (Esc, Ctrl-C, etc.) or on error.
-pub fn fuzzy_select(items: &[String], current: Option<&str>) -> Option<String> {
+/// Open fzf immediately, then run `loader` in a background thread to fetch
+/// items. Items are written to fzf's stdin as soon as they're available so
+/// the user can start searching while data is still loading.
+///
+/// `header` is shown as a static header line in fzf (e.g. "⏳ Loading namespaces…").
+/// `current` highlights the currently-active item with `*`.
+/// `loader` runs on a background thread and returns the full list of items.
+///
+/// Returns the selected item, or None if the user cancelled or fzf failed.
+pub fn fuzzy_select_streaming(
+    current: Option<&str>,
+    loader: impl FnOnce() -> Vec<String> + Send + 'static,
+) -> Option<String> {
     let fzf_path = which_fzf()?;
 
+    // Open fzf immediately — its UI is interactive from the start, reading
+    // from stdin in the background. Items appear as they arrive.
     let mut child = Command::new(&fzf_path)
         .arg("--ansi")
         .arg("--no-preview")
@@ -50,24 +68,32 @@ pub fn fuzzy_select(items: &[String], current: Option<&str>) -> Option<String> {
         .spawn()
         .ok()?;
 
-    // Write items to fzf stdin, highlighting the current one
-    if let Some(mut stdin) = child.stdin.take() {
-        for item in items {
-            if Some(item.as_str()) == current {
-                // Mark current with an asterisk and color
+    // Take ownership of stdin so the background thread can write to it.
+    let stdin = child.stdin.take()?;
+    let current_owned = current.map(|s| s.to_string());
+
+    // Spawn a background thread to fetch data and stream items to fzf.
+    // fzf is already open and interactive — items will appear as they
+    // are written, and stdin EOF (via drop) signals the list is complete.
+    let handle = std::thread::spawn(move || {
+        let items = loader();
+        let mut stdin = stdin;
+        for item in &items {
+            if Some(item.as_str()) == current_owned.as_deref() {
+                // Highlight the current item
                 let line = format!("{} {}\n", "*".yellow(), item.cyan());
                 let _ = stdin.write_all(line.as_bytes());
             } else {
                 let _ = stdin.write_all(format!("  {}\n", item).as_bytes());
             }
         }
-        // Drop stdin to signal EOF
-        drop(stdin);
-    }
+        drop(stdin); // EOF — tells fzf the list is complete
+    });
 
     let output = child.wait_with_output().ok()?;
+    handle.join().ok()?;
+
     if !output.status.success() {
-        // Show fzf errors if any
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.trim().is_empty() {
             eprintln!("{} fzf: {}", "warning:".yellow(), stderr.trim());
@@ -83,5 +109,3 @@ pub fn fuzzy_select(items: &[String], current: Option<&str>) -> Option<String> {
     // Strip the leading "  " or "* " prefix
     Some(trimmed.trim_start().to_string())
 }
-
-use colored::Colorize;

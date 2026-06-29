@@ -222,26 +222,35 @@ fn op_delete(names: &[String]) -> Result<(), String> {
 fn op_delete_interactive() -> Result<(), String> {
     let kc = kubeconfig::Kubeconfig::load_default()
         .map_err(|e| format!("kubeconfig error: {}", e))?;
-    let contexts = kc.get_contexts();
     let current = kc.get_current_context();
-    if contexts.is_empty() {
-        return Err("no contexts found in kubeconfig".into());
-    }
-    let selected = fzf::fuzzy_select(&contexts, current.as_deref())
-        .ok_or_else(|| "no context selected".to_string())?;
+
+    let selected = fzf::fuzzy_select_streaming(
+        current.as_deref(),
+        || {
+            let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+            kc.get_contexts()
+        },
+    )
+    .ok_or_else(|| "no context selected".to_string())?;
     op_delete(&[selected])
 }
 
 /// Interactive switch with fzf.
+/// Opens fzf immediately, then loads contexts from kubeconfig in a background
+/// thread (context loading is local file I/O so this is near-instant).
 fn op_interactive_switch() -> Result<(), String> {
+    // Load kubeconfig just to get the current context (fast, local files)
     let kc = kubeconfig::Kubeconfig::load_default()
         .map_err(|e| format!("kubeconfig error: {}", e))?;
-    let contexts = kc.get_contexts();
     let current = kc.get_current_context();
-    if contexts.is_empty() {
-        return Err("no contexts found in kubeconfig".into());
-    }
-    let selected = fzf::fuzzy_select(&contexts, current.as_deref())
-        .ok_or_else(|| "no context selected".to_string())?;
+
+    let selected = fzf::fuzzy_select_streaming(
+        current.as_deref(),
+        || {
+            let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+            kc.get_contexts()
+        },
+    )
+    .ok_or_else(|| "no context selected".to_string())?;
     op_switch(&selected)
 }

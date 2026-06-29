@@ -281,24 +281,27 @@ fn op_delete(names: &[String]) -> Result<(), String> {
 }
 
 /// Interactive switch with fzf.
-/// Queries the live cluster for the full namespace list when available.
+/// Opens fzf immediately, then queries `kubectl get namespaces` in a
+/// background thread. Items stream in as the cluster responds.
 fn op_interactive_switch() -> Result<(), String> {
+    // Load kubeconfig just to get the current namespace (fast, local files)
     let kc = kubeconfig::Kubeconfig::load_default()
         .map_err(|e| format!("kubeconfig error: {}", e))?;
-
-    // Try the live cluster first, fall back to kubeconfig
-    let namespaces = match query_cluster_namespaces() {
-        Some(ns) if !ns.is_empty() => ns,
-        _ => {
-            let ns = kc.get_namespaces();
-            if ns.is_empty() {
-                return Err("no namespaces found in current context".into());
-            }
-            ns
-        }
-    };
     let current = kc.get_current_namespace();
-    let selected = fzf::fuzzy_select(&namespaces, current.as_deref())
-        .ok_or_else(|| "no namespace selected".to_string())?;
+
+    let selected = fzf::fuzzy_select_streaming(
+        current.as_deref(),
+        || {
+            // Try the live cluster first, fall back to kubeconfig namespaces
+            match query_cluster_namespaces() {
+                Some(ns) if !ns.is_empty() => ns,
+                _ => {
+                    let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+                    kc.get_namespaces()
+                }
+            }
+        },
+    )
+    .ok_or_else(|| "no namespace selected".to_string())?;
     op_switch(&selected)
 }
