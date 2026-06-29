@@ -24,6 +24,33 @@ pub fn print_context_list(contexts: &[String], current: Option<&str>) {
     }
 }
 
+/// Print the list of contexts with health indicators.
+pub fn print_context_list_with_health(
+    contexts: &[String],
+    current: Option<&str>,
+    health: &std::collections::HashMap<String, crate::health::Health>,
+) {
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    for ctx in contexts {
+        let marker = if Some(ctx.as_str()) == current {
+            "*".yellow().bold().to_string()
+        } else {
+            " ".to_string()
+        };
+        let health_indicator = health
+            .get(ctx)
+            .map(|h| h.indicator())
+            .unwrap_or_else(|| " ".to_string());
+        let name = if Some(ctx.as_str()) == current {
+            ctx.cyan().bold().to_string()
+        } else {
+            ctx.clone()
+        };
+        let _ = writeln!(out, "{} {} {}", marker, health_indicator, name);
+    }
+}
+
 /// Print the list of namespaces, highlighting the current one.
 pub fn print_namespace_list(namespaces: &[String], current: Option<&str>) {
     let stdout = io::stdout();

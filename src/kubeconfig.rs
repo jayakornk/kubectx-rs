@@ -273,6 +273,17 @@ impl Kubeconfig {
         self.get_namespaces().iter().any(|n| n == name)
     }
 
+    /// Get detailed info about a specific context.
+    /// Returns cluster name, server URL, user name, and namespace (if any).
+    pub fn get_context_info(&self, context: &str) -> Option<ContextInfo> {
+        for f in &self.files {
+            if let Some(info) = get_context_info(&f.document, context) {
+                return Some(info);
+            }
+        }
+        None
+    }
+
     /// Save all modified files.
     pub fn save(&self) -> Result<(), KubeconfigError> {
         for f in &self.files {
@@ -280,6 +291,17 @@ impl Kubeconfig {
         }
         Ok(())
     }
+}
+
+/// Detailed information about a single context.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ContextInfo {
+    pub name: String,
+    pub cluster: String,
+    pub cluster_server: Option<String>,
+    pub user: String,
+    pub namespace: Option<String>,
 }
 
 /// Errors from kubeconfig operations.
@@ -531,6 +553,73 @@ fn unset_context_namespace(doc: &mut Value, context_name: &str) -> bool {
         }
     }
     false
+}
+
+/// Get detailed info about a context: cluster, user, server URL, namespace.
+fn get_context_info(doc: &Value, context_name: &str) -> Option<ContextInfo> {
+    if let Value::Mapping(map) = doc {
+        if let Some(Value::Sequence(seq)) = map.get(Value::String("contexts".into())) {
+            for entry in seq {
+                if let Value::Mapping(entry_map) = entry {
+                    let name = entry_map
+                        .get(Value::String("name".into()))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    if name.as_deref() == Some(context_name) {
+                        let ctx = entry_map.get(Value::String("context".into()));
+                        let cluster = ctx
+                            .and_then(|c| c.get(Value::String("cluster".into())))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let user = ctx
+                            .and_then(|c| c.get(Value::String("user".into())))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let namespace = ctx
+                            .and_then(|c| c.get(Value::String("namespace".into())))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        // Look up cluster server URL
+                        let cluster_server = if !cluster.is_empty() {
+                            map.get(Value::String("clusters".into()))
+                                .and_then(|v| v.as_sequence())
+                                .and_then(|seq| {
+                                    seq.iter().find_map(|e| {
+                                        if let Value::Mapping(em) = e {
+                                            let cn = em
+                                                .get(Value::String("name".into()))
+                                                .and_then(|v| v.as_str());
+                                            if cn == Some(cluster.as_str()) {
+                                                return em
+                                                    .get(Value::String("cluster".into()))
+                                                    .and_then(|c| c.get(Value::String("server".into())))
+                                                    .and_then(|v| v.as_str())
+                                                    .map(|s| s.to_string());
+                                            }
+                                        }
+                                        None
+                                    })
+                                })
+                        } else {
+                            None
+                        };
+
+                        return Some(ContextInfo {
+                            name: context_name.to_string(),
+                            cluster,
+                            cluster_server,
+                            user,
+                            namespace,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]
