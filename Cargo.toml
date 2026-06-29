@@ -1,0 +1,23 @@
+[package]
+name = "kubectx-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Faster way to switch between clusters and namespaces in kubectl (Rust port)"
+license = "Apache-2.0"
+
+[[bin]]
+name = "kubectx"
+path = "src/main.rs"
+
+[[bin]]
+name = "kubens"
+path = "src/kubens_main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+colored = "2"
+dirs = "5"
+
+[profile.release]
+opt-level = 2
