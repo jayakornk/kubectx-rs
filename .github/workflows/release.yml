@@ -201,9 +201,25 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            REF="refs/tags/${{ inputs.tag }}"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            REF="${GITHUB_REF}"
           fi
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout (full history for git-cliff)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Generate changelog (git-cliff)
+        id: cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -216,7 +232,7 @@ jobs:
         with:
           tag_name: ${{ steps.ref.outputs.tag }}
           name: ${{ steps.ref.outputs.tag }}
-          generate_release_notes: true
+          body: ${{ steps.cliff.outputs.content }}
           files: |
             artifacts/*.tar.gz
             artifacts/*.tar.gz.sha256

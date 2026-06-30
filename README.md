@@ -150,6 +150,8 @@ cargo release patch -x      # 0.1.0 -> 0.1.1   (also: minor, major)
 - create and push a `v<version>` tag.
 
 > `cargo-release` is dry-run by default; the `-x` / `--execute` flag applies the changes.
+>
+> The version-bump commit (`chore(release): <version>`) follows Conventional Commits, so git-cliff excludes it from the changelog — only `feat`/`fix`/`perf`/etc. appear.
 
 ### What then happens automatically (on the pushed `v*` tag)
 
@@ -159,7 +161,7 @@ The `release` GitHub Actions workflow runs, gated so nothing ships unless every 
 2. **test** — `cargo fmt --check` + `cargo test --locked`.
 3. **security** — `cargo audit --deny warnings` (RustSec advisory scan of `Cargo.lock`).
 4. **build** — precompiles `kubectx` + `kubens` for macOS (arm64/x86_64) and Linux (x86_64/arm64).
-5. **release** — publishes a GitHub Release with the binaries + checksums.
+5. **release** — generates a changelog from Conventional Commits via [git-cliff](https://github.com/orhun/git-cliff) (`cliff.toml`) and publishes a GitHub Release with the changelog, binaries, and checksums.
 6. **tap-bump** — updates the `kubectx-rs` formula in [`jayakornk/homebrew-tap`](https://github.com/jayakornk/homebrew-tap) (new `url` + `sha256`) so `brew upgrade kubectx-rs` works immediately.
 
 `ci.yml` independently runs the same fmt/test/audit checks on every push to `main` and on pull requests.

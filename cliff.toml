@@ -1,0 +1,42 @@
+# git-cliff configuration — generates a changelog from Conventional Commits.
+# Used by the release workflow (.github/workflows/release.yml) to populate
+# GitHub Release notes.  Docs: https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }} ({{ commit.id | truncate(length=7, end="") }})
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+require_conventional = false
+
+# Categorize conventional-commit types; skip housekeeping types so the
+# release bump (`chore(release): …`), CI, and build commits don't clutter notes.
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^revert", group = "Reverts" },
+  { message = "^style", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+  { message = "^release", skip = true },
+  { message = ".*", group = "Other" },
+]
+filter_commits = true
+tag_pattern = "v[0-9].*"

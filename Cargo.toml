@@ -27,5 +27,5 @@ opt-level = 2
 publish = false
 # Tag as v0.2.0 (matches the release.yml `v*` trigger and the Homebrew formula url).
 tag-name = "v{{version}}"
-pre-release-commit-message = "release: {{version}}"
-tag-message = "release: {{version}}"
+pre-release-commit-message = "chore(release): {{version}}"
+tag-message = "chore(release): {{version}}"
