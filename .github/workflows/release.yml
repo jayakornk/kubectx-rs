@@ -22,8 +22,65 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    name: Test + fmt (release gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve ref + tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            REF="refs/tags/${TAG}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            REF="${GITHUB_REF}"
+          fi
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+      - name: cargo test --locked
+        run: cargo test --locked
+
+  security:
+    name: Security audit (release gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="refs/tags/${{ inputs.tag }}"
+          else
+            REF="${GITHUB_REF}"
+          fi
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        run: cargo audit --deny warnings
+
   build:
     name: Build ${{ matrix.target }}
+    needs: [test, security]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

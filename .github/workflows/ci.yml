@@ -1,0 +1,39 @@
+name: ci
+
+# Continuous checks on every push to main and on pull requests:
+#   - formatting check + test suite
+#   - dependency vulnerability scan (cargo-audit against the RustSec advisory DB)
+# The release pipeline (release.yml) re-runs these as gates before publishing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: fmt + test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt --check
+        run: cargo fmt --check
+      - name: cargo test --locked
+        run: cargo test --locked
+
+  security:
+    name: cargo audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: cargo audit
+        run: cargo audit --deny warnings
