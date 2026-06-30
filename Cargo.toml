@@ -21,3 +21,11 @@ dirs = "6"
 
 [profile.release]
 opt-level = 2
+
+[package.metadata.release]
+# Distributed via GitHub Releases + a Homebrew tap — NOT published to crates.io.
+publish = false
+# Tag as v0.2.0 (matches the release.yml `v*` trigger and the Homebrew formula url).
+tag-name = "v{{version}}"
+pre-release-commit-message = "release: {{version}}"
+tag-message = "release: {{version}}"

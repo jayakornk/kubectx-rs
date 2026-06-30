@@ -133,12 +133,65 @@ cargo test              # unit tests
 bash tests/integration_test.sh   # integration tests
 ```
 
+## Releasing
+
+Releases are automated. The only manual step is bumping the version and tagging, which [`cargo-release`](https://github.com/crate-ci/cargo-release) handles for you.
+
+### One-command release
+
+```shell
+cargo release patch -x      # 0.1.0 -> 0.1.1   (also: minor, major)
+```
+
+`cargo-release` is configured in `[package.metadata.release]` in `Cargo.toml` and will:
+
+- bump `version` in `Cargo.toml` and `Cargo.lock`,
+- commit it as `release: <version>`,
+- create and push a `v<version>` tag.
+
+> `cargo-release` is dry-run by default; the `-x` / `--execute` flag applies the changes.
+
+### What then happens automatically (on the pushed `v*` tag)
+
+The `release` GitHub Actions workflow runs, gated so nothing ships unless every check passes:
+
+1. **verify-version** — fails fast if `Cargo.toml`'s version doesn't match the tag, so a mismatched tag can never produce a broken release.
+2. **test** — `cargo fmt --check` + `cargo test --locked`.
+3. **security** — `cargo audit --deny warnings` (RustSec advisory scan of `Cargo.lock`).
+4. **build** — precompiles `kubectx` + `kubens` for macOS (arm64/x86_64) and Linux (x86_64/arm64).
+5. **release** — publishes a GitHub Release with the binaries + checksums.
+6. **tap-bump** — updates the `kubectx-rs` formula in [`jayakornk/homebrew-tap`](https://github.com/jayakornk/homebrew-tap) (new `url` + `sha256`) so `brew upgrade kubectx-rs` works immediately.
+
+`ci.yml` independently runs the same fmt/test/audit checks on every push to `main` and on pull requests.
+
+### Installing from the tap
+
+```shell
+brew tap jayakornk/tap
+brew install kubectx-rs      # installs both kubectx and kubens
+```
+
+### Manual release (without cargo-release)
+
+```shell
+# 1. bump the version to match the tag you intend to create
+$EDITOR Cargo.toml           # version = "0.2.0"
+cargo build -q                # refresh Cargo.lock
+git add Cargo.toml Cargo.lock
+git commit -m "release: 0.2.0"
+# 2. tag that exact commit and push
+git tag v0.2.0
+git push origin main --tags
+```
+
+The `verify-version` guard enforces that `Cargo.toml`'s version equals the tag; if they differ the release aborts before building anything.
+
 ## Differences from the Go original
 
 - Written in Rust for fast, self-contained binaries
 - Namespace listing shells out to `kubectl get namespaces` instead of using client-go
 - Read-only shell uses a kubectl wrapper script instead of an HTTP proxy
-- Uses `serde_yaml` for YAML parsing instead of `sigs.k8s.io/yaml`
+- Uses `serde_yaml_ng` for YAML parsing instead of `sigs.k8s.io/yaml`
 - Added: `--info`, `--health`, `--dry-run`, `--output json`, context aliases
 
 ## License

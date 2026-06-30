@@ -22,8 +22,44 @@ permissions:
   contents: write
 
 jobs:
+  verify-version:
+    name: Verify Cargo.toml version == tag
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve ref + tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            REF="refs/tags/${TAG}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            REF="${GITHUB_REF}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - name: Compare Cargo.toml version to tag
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          EXPECTED="${TAG#v}"
+          ACTUAL=$(grep -E '^version' Cargo.toml | head -1 | sed -E 's/^version = "([^"]+)".*/\1/')
+          echo "tag (without v): ${EXPECTED}"
+          echo "Cargo.toml version: ${ACTUAL}"
+          if [ "${EXPECTED}" != "${ACTUAL}" ]; then
+            echo "::error::Version mismatch: tag '${TAG}' expects Cargo.toml version '${EXPECTED}', but Cargo.toml says '${ACTUAL}'. Bump Cargo.toml's version (e.g. via 'cargo release') to match the tag before tagging."
+            exit 1
+          fi
+          echo "Versions match"
+
   test:
     name: Test + fmt (release gate)
+    needs: [verify-version]
     runs-on: ubuntu-24.04
     steps:
       - name: Resolve ref + tag
@@ -54,6 +90,7 @@ jobs:
 
   security:
     name: Security audit (release gate)
+    needs: [verify-version]
     runs-on: ubuntu-24.04
     steps:
       - name: Resolve ref
