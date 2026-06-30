@@ -1,0 +1,116 @@
+name: release
+
+# Builds precompiled `kubectx` + `kubens` binaries for macOS (arm64/x86_64)
+# and Linux (x86_64/arm64) and attaches them to a GitHub Release.
+#
+# Triggers:
+#   - pushing a `v*` tag (normal release path), or
+#   - manual run via "Run workflow" with a tag input (used to (re)build an
+#     already-pushed tag, e.g. back-filling v0.1.0 after this workflow was added).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and publish (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-14
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - name: Resolve ref + tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            REF="refs/tags/${TAG}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            REF="${GITHUB_REF}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build (release, locked)
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Package binaries
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          VERSION="${TAG#v}"
+          STAGING="kubectx-rs-${VERSION}-${TARGET}"
+          mkdir "${STAGING}"
+          cp "target/${TARGET}/release/kubectx" "${STAGING}/"
+          cp "target/${TARGET}/release/kubens" "${STAGING}/"
+          tar -czf "${STAGING}.tar.gz" "${STAGING}"
+          shasum -a 256 "${STAGING}.tar.gz" > "${STAGING}.tar.gz.sha256"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubectx-rs-${{ env.VERSION }}-${{ matrix.target }}
+          path: |
+            kubectx-rs-*.tar.gz
+            kubectx-rs-*.tar.gz.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ref.outputs.tag }}
+          name: ${{ steps.ref.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.tar.gz.sha256
