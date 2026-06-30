@@ -53,7 +53,7 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "ref=${REF}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.ref.outputs.ref }}
 
@@ -89,7 +89,7 @@ jobs:
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kubectx-rs-${{ env.VERSION }}-${{ matrix.target }}
           path: |
@@ -112,13 +112,13 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
       - name: Create / update release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.ref.outputs.tag }}
           name: ${{ steps.ref.outputs.tag }}
@@ -154,7 +154,7 @@ jobs:
           echo "Computed sha256 for ${TAG}: ${SHA}"
 
       - name: Checkout homebrew-tap (with PAT)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: jayakornk/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
