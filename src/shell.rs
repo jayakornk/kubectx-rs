@@ -146,11 +146,11 @@ exec {1} "$@"
 fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Result<String, String> {
     // We need to find the context entry, its cluster, and its user,
     // then build a new kubeconfig with only those entries.
-    let yaml = serde_yaml::to_string(kc.files().first().map(|f| &f.document).ok_or("no kubeconfig files")?)
+    let yaml = serde_yaml_ng::to_string(kc.files().first().map(|f| &f.document).ok_or("no kubeconfig files")?)
         .map_err(|e| format!("failed to serialize: {}", e))?;
 
     // Parse the full kubeconfig
-    let doc: serde_yaml::Value = serde_yaml::from_str(&yaml)
+    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&yaml)
         .map_err(|e| format!("failed to parse: {}", e))?;
 
     // Find the context entry
@@ -173,26 +173,26 @@ fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Res
         .ok_or("no user in context")?;
 
     // Build a new kubeconfig
-    let mut new_doc = serde_yaml::Mapping::new();
+    let mut new_doc = serde_yaml_ng::Mapping::new();
     new_doc.insert(
-        serde_yaml::Value::String("apiVersion".into()),
-        serde_yaml::Value::String("v1".into()),
+        serde_yaml_ng::Value::String("apiVersion".into()),
+        serde_yaml_ng::Value::String("v1".into()),
     );
     new_doc.insert(
-        serde_yaml::Value::String("kind".into()),
-        serde_yaml::Value::String("Config".into()),
+        serde_yaml_ng::Value::String("kind".into()),
+        serde_yaml_ng::Value::String("Config".into()),
     );
     new_doc.insert(
-        serde_yaml::Value::String("current-context".into()),
-        serde_yaml::Value::String(context.into()),
+        serde_yaml_ng::Value::String("current-context".into()),
+        serde_yaml_ng::Value::String(context.into()),
     );
 
     // Add the context entry
-    let mut ctx_seq = serde_yaml::Sequence::new();
+    let mut ctx_seq = serde_yaml_ng::Sequence::new();
     ctx_seq.push(context_entry.clone());
     new_doc.insert(
-        serde_yaml::Value::String("contexts".into()),
-        serde_yaml::Value::Sequence(ctx_seq),
+        serde_yaml_ng::Value::String("contexts".into()),
+        serde_yaml_ng::Value::Sequence(ctx_seq),
     );
 
     // Add the matching cluster
@@ -200,11 +200,11 @@ fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Res
         if let Some(cluster_entry) = clusters.iter().find(|e| {
             e.get("name").and_then(|n| n.as_str()) == Some(cluster_name)
         }) {
-            let mut cluster_seq = serde_yaml::Sequence::new();
+            let mut cluster_seq = serde_yaml_ng::Sequence::new();
             cluster_seq.push(cluster_entry.clone());
             new_doc.insert(
-                serde_yaml::Value::String("clusters".into()),
-                serde_yaml::Value::Sequence(cluster_seq),
+                serde_yaml_ng::Value::String("clusters".into()),
+                serde_yaml_ng::Value::Sequence(cluster_seq),
             );
         }
     }
@@ -214,16 +214,16 @@ fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Res
         if let Some(user_entry) = users.iter().find(|e| {
             e.get("name").and_then(|n| n.as_str()) == Some(user_name)
         }) {
-            let mut user_seq = serde_yaml::Sequence::new();
+            let mut user_seq = serde_yaml_ng::Sequence::new();
             user_seq.push(user_entry.clone());
             new_doc.insert(
-                serde_yaml::Value::String("users".into()),
-                serde_yaml::Value::Sequence(user_seq),
+                serde_yaml_ng::Value::String("users".into()),
+                serde_yaml_ng::Value::Sequence(user_seq),
             );
         }
     }
 
-    serde_yaml::to_string(&serde_yaml::Value::Mapping(new_doc))
+    serde_yaml_ng::to_string(&serde_yaml_ng::Value::Mapping(new_doc))
         .map_err(|e| format!("failed to serialize temp kubeconfig: {}", e))
 }
 

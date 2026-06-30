@@ -11,7 +11,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_yaml::Value;
+use serde_yaml_ng::Value;
 
 const KUBECONFIG_ENV: &str = "KUBECONFIG";
 
@@ -29,9 +29,9 @@ impl KubeconfigFile {
             KubeconfigError::Io(format!("failed to read {}: {}", path.display(), e))
         })?;
         let doc: Value = if contents.trim().is_empty() {
-            Value::Mapping(serde_yaml::Mapping::new())
+            Value::Mapping(serde_yaml_ng::Mapping::new())
         } else {
-            serde_yaml::from_str(&contents).map_err(|e| {
+            serde_yaml_ng::from_str(&contents).map_err(|e| {
                 KubeconfigError::Parse(format!("failed to parse {}: {}", path.display(), e))
             })?
         };
@@ -43,7 +43,7 @@ impl KubeconfigFile {
 
     /// Serialize and save back to disk.
     pub fn save(&self) -> Result<(), KubeconfigError> {
-        let yaml = serde_yaml::to_string(&self.document).map_err(|e| {
+        let yaml = serde_yaml_ng::to_string(&self.document).map_err(|e| {
             KubeconfigError::Parse(format!("failed to serialize {}: {}", self.path.display(), e))
         })?;
         fs::write(&self.path, yaml).map_err(|e| {
@@ -364,7 +364,7 @@ fn get_field_str(doc: &Value, field: &str) -> Option<String> {
 
 /// Set a string field in a YAML mapping.
 fn set_field_str(doc: &mut Value, field: &str, value: &str) {
-    if let Value::Mapping(ref mut map) = doc {
+    if let Value::Mapping(map) = doc {
         map.insert(
             Value::String(field.into()),
             Value::String(value.into()),
@@ -393,8 +393,8 @@ fn get_context_names(doc: &Value) -> Vec<String> {
 
 /// Remove a context entry by name. Returns true if removed.
 fn remove_context(doc: &mut Value, name: &str) -> bool {
-    if let Value::Mapping(ref mut map) = doc {
-        if let Some(Value::Sequence(ref mut seq)) =
+    if let Value::Mapping(map) = doc {
+        if let Some(Value::Sequence(seq)) =
             map.get_mut(Value::String("contexts".into()))
         {
             let len_before = seq.len();
@@ -416,12 +416,12 @@ fn remove_context(doc: &mut Value, name: &str) -> bool {
 
 /// Rename a context entry. Returns true if renamed.
 fn rename_context_entry(doc: &mut Value, old_name: &str, new_name: &str) -> bool {
-    if let Value::Mapping(ref mut map) = doc {
-        if let Some(Value::Sequence(ref mut seq)) =
+    if let Value::Mapping(map) = doc {
+        if let Some(Value::Sequence(seq)) =
             map.get_mut(Value::String("contexts".into()))
         {
             for entry in seq.iter_mut() {
-                if let Value::Mapping(ref mut entry_map) = entry {
+                if let Value::Mapping(entry_map) = entry {
                     if entry_map
                         .get(Value::String("name".into()))
                         .and_then(|v| v.as_str())
@@ -499,12 +499,12 @@ fn get_all_namespaces_for_context(doc: &Value, context_name: &str) -> Vec<String
 
 /// Set the namespace for a specific context entry. Returns true if set.
 fn set_context_namespace(doc: &mut Value, context_name: &str, namespace: &str) -> bool {
-    if let Value::Mapping(ref mut map) = doc {
-        if let Some(Value::Sequence(ref mut seq)) =
+    if let Value::Mapping(map) = doc {
+        if let Some(Value::Sequence(seq)) =
             map.get_mut(Value::String("contexts".into()))
         {
             for entry in seq.iter_mut() {
-                if let Value::Mapping(ref mut entry_map) = entry {
+                if let Value::Mapping(entry_map) = entry {
                     let name = entry_map
                         .get(Value::String("name".into()))
                         .and_then(|v| v.as_str())
@@ -512,8 +512,8 @@ fn set_context_namespace(doc: &mut Value, context_name: &str, namespace: &str) -
                     if name.as_deref() == Some(context_name) {
                         let ctx_field = entry_map
                             .entry(Value::String("context".into()))
-                            .or_insert_with(|| Value::Mapping(serde_yaml::Mapping::new()));
-                        if let Value::Mapping(ref mut ctx_map) = ctx_field {
+                            .or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
+                        if let Value::Mapping(ctx_map) = ctx_field {
                             ctx_map.insert(
                                 Value::String("namespace".into()),
                                 Value::String(namespace.into()),
@@ -530,18 +530,18 @@ fn set_context_namespace(doc: &mut Value, context_name: &str, namespace: &str) -
 
 /// Unset the namespace for a specific context entry. Returns true if removed.
 fn unset_context_namespace(doc: &mut Value, context_name: &str) -> bool {
-    if let Value::Mapping(ref mut map) = doc {
-        if let Some(Value::Sequence(ref mut seq)) =
+    if let Value::Mapping(map) = doc {
+        if let Some(Value::Sequence(seq)) =
             map.get_mut(Value::String("contexts".into()))
         {
             for entry in seq.iter_mut() {
-                if let Value::Mapping(ref mut entry_map) = entry {
+                if let Value::Mapping(entry_map) = entry {
                     let name = entry_map
                         .get(Value::String("name".into()))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
                     if name.as_deref() == Some(context_name) {
-                        if let Some(Value::Mapping(ref mut ctx_map)) =
+                        if let Some(Value::Mapping(ctx_map)) =
                             entry_map.get_mut(Value::String("context".into()))
                         {
                             ctx_map.remove(Value::String("namespace".into()));
@@ -627,7 +627,7 @@ mod tests {
     use super::*;
 
     fn make_doc(yaml_str: &str) -> Value {
-        serde_yaml::from_str(yaml_str).unwrap()
+        serde_yaml_ng::from_str(yaml_str).unwrap()
     }
 
     #[test]
@@ -826,7 +826,8 @@ contexts:
     fn test_resolve_kubeconfig_paths() {
         // Test KUBECONFIG env var mode
         let saved = std::env::var("KUBECONFIG").ok();
-        std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b:/tmp/c");
+        // SAFETY: single-threaded test; we save and restore KUBECONFIG below.
+        unsafe { std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b:/tmp/c"); }
         let paths = resolve_kubeconfig_paths();
         assert_eq!(paths.len(), 3);
         assert_eq!(paths[0], std::path::PathBuf::from("/tmp/a"));
@@ -834,14 +835,16 @@ contexts:
         assert_eq!(paths[2], std::path::PathBuf::from("/tmp/c"));
 
         // Test default mode (KUBECONFIG unset)
-        std::env::remove_var("KUBECONFIG");
+        // SAFETY: single-threaded test; we restore KUBECONFIG below.
+        unsafe { std::env::remove_var("KUBECONFIG"); }
         let paths = resolve_kubeconfig_paths();
         assert!(!paths.is_empty());
         assert!(paths[0].to_string_lossy().contains(".kube"));
 
         // Restore
         if let Some(v) = saved {
-            std::env::set_var("KUBECONFIG", v);
+            // SAFETY: single-threaded test; restoring the previously saved value.
+            unsafe { std::env::set_var("KUBECONFIG", v); }
         }
     }
 }
