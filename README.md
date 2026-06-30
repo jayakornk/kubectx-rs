@@ -1,6 +1,11 @@
 # kubectx-rs
 
-A Rust port of [kubectx](https://github.com/ahmetb/kubectx) — a faster way to switch between clusters and namespaces in kubectl.
+A Rust port of **[kubectx](https://github.com/ahmetb/kubectx)** by [Ahmet Alp Balkan](https://github.com/ahmetb) — a faster way to switch between clusters and namespaces in kubectl. All credit for the original design, features, and idea goes to the upstream project.
+
+> [!WARNING]
+> **AI-Generated — Use at Your Own Risk**
+>
+> The entire codebase in this repository was written and ported by an AI. No human has reviewed, audited, or verified any of the code. There are no guarantees of correctness, security, or fitness for any purpose. **You are solely responsible for reviewing and validating this software before using it in any environment — especially production.**
 
 ## Features
 
@@ -44,15 +49,42 @@ Binaries are at `target/release/kubectx` and `target/release/kubens`.
 
 ## Installation
 
-```shell
-# Remove the Homebrew version if installed
-brew uninstall kubectx
+> [!IMPORTANT]
+> **This port ships the same `kubectx` and `kubens` command names as the original.** Installing both will conflict. If you already have the original `kubectx` (Go) installed via `brew install kubectx` or otherwise, **uninstall it first** before installing this Rust port — otherwise the two binaries will shadow each other and you may unknowingly run the wrong one.
 
-# Install the Rust version
+### Homebrew (via tap)
+
+```shell
+# If the original kubectx is installed, remove it first
+brew uninstall kubectx          # removes the Go original (ahmetb/kubectx)
+
+# Add the tap and install
+brew tap jayakornk/tap
+brew install kubectx-rs          # installs both kubectx and kubens
+
+# Upgrading later
+brew upgrade kubectx-rs
+```
+
+### Build from source
+
+```shell
+# If the original kubectx is installed, remove it first
+brew uninstall kubectx          # if installed via Homebrew
+
+# Clone and build
+
+git clone https://github.com/jayakornk/kubectx-rs.git
+cd kubectx-rs
+cargo build --release
+
+# Install via cargo
 cargo install --path .
 
-# Or copy directly
-cp target/release/kubectx target/release/kubens /opt/homebrew/bin/
+# Or copy the binaries directly
+sudo cp target/release/kubectx target/release/kubens /usr/local/bin/
+# On Apple Silicon Homebrew:
+# sudo cp target/release/kubectx target/release/kubens /opt/homebrew/bin/
 ```
 
 ## Shell completions
@@ -166,13 +198,6 @@ The `release` GitHub Actions workflow runs, gated so nothing ships unless every 
 
 `ci.yml` independently runs the same fmt/test/audit checks on every push to `main` and on pull requests.
 
-### Installing from the tap
-
-```shell
-brew tap jayakornk/tap
-brew install kubectx-rs      # installs both kubectx and kubens
-```
-
 ### Manual release (without cargo-release)
 
 ```shell
@@ -187,6 +212,10 @@ git push origin main --tags
 ```
 
 The `verify-version` guard enforces that `Cargo.toml`'s version equals the tag; if they differ the release aborts before building anything.
+
+## Acknowledgements
+
+This project is a port of [**kubectx**](https://github.com/ahmetb/kubectx) by [Ahmet Alp Balkan](https://github.com/ahmetb). All credit for the original tool, its feature design, and its UX belongs to the upstream project and its contributors.
 
 ## Differences from the Go original
 
