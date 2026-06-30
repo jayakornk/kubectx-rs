@@ -23,14 +23,14 @@
 //   kubectx -h, --help            : show this message
 //   kubectx -V, --version         : show version
 
+mod alias;
+mod completion;
+mod fzf;
+mod health;
 mod kubeconfig;
 mod printer;
-mod fzf;
-mod state;
-mod alias;
-mod health;
 mod shell;
-mod completion;
+mod state;
 
 use std::env;
 use std::process::ExitCode;
@@ -213,8 +213,8 @@ fn run(args: &[String]) -> Result<(), String> {
 
 /// List all available contexts.
 fn op_list(flags: &GlobalFlags) -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let contexts = kc.get_contexts();
     let current = kc.get_current_context();
     if contexts.is_empty() {
@@ -247,8 +247,8 @@ fn op_list(flags: &GlobalFlags) -> Result<(), String> {
 
 /// Show the current context name.
 fn op_current() -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     match kc.get_current_context() {
         Some(ctx) => {
             println!("{}", ctx);
@@ -260,8 +260,8 @@ fn op_current() -> Result<(), String> {
 
 /// Switch to a context by name.
 fn op_switch(name: &str, flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     if !kc.context_exists(name) {
         return Err(format!("no context exists with name \"{}\"", name));
@@ -277,13 +277,18 @@ fn op_switch(name: &str, flags: &GlobalFlags) -> Result<(), String> {
     }
 
     if flags.dry_run {
-        eprintln!("{} Would switch to context \"{}\"", "dry-run:".yellow(), name.cyan());
+        eprintln!(
+            "{} Would switch to context \"{}\"",
+            "dry-run:".yellow(),
+            name.cyan()
+        );
         return Ok(());
     }
 
     kc.set_current_context(name)
         .map_err(|e| format!("failed to set current context: {}", e))?;
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_switched_context(name);
     Ok(())
 }
@@ -292,22 +297,27 @@ fn op_switch(name: &str, flags: &GlobalFlags) -> Result<(), String> {
 fn op_switch_by_alias(alias_name: &str, flags: &GlobalFlags) -> Result<(), String> {
     match alias::resolve_alias(alias_name) {
         Some(ctx) => op_switch(&ctx, flags),
-        None => Err(format!("no alias \"@{}\" found. Set one with: kubectx @{}=<context>", alias_name, alias_name)),
+        None => Err(format!(
+            "no alias \"@{}\" found. Set one with: kubectx @{}=<context>",
+            alias_name, alias_name
+        )),
     }
 }
 
 /// Set an alias.
 fn op_set_alias(alias_name: &str, ctx_name: &str) -> Result<(), String> {
     // Validate that the context exists
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     if !kc.context_exists(ctx_name) {
         return Err(format!("no context exists with name \"{}\"", ctx_name));
     }
 
-    alias::set_alias(alias_name, ctx_name)
-        .map_err(|e| format!("failed to write alias: {}", e))?;
-    printer::print_success(&format!("Alias \"@{}\" → \"{}\" set.", alias_name, ctx_name));
+    alias::set_alias(alias_name, ctx_name).map_err(|e| format!("failed to write alias: {}", e))?;
+    printer::print_success(&format!(
+        "Alias \"@{}\" → \"{}\" set.",
+        alias_name, ctx_name
+    ));
     Ok(())
 }
 
@@ -338,8 +348,8 @@ fn op_swap(flags: &GlobalFlags) -> Result<(), String> {
 
 /// Unset the current context.
 fn op_unset(flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     if flags.dry_run {
         eprintln!("{} Would unset current context", "dry-run:".yellow());
@@ -348,24 +358,31 @@ fn op_unset(flags: &GlobalFlags) -> Result<(), String> {
 
     kc.unset_current_context()
         .map_err(|e| format!("failed to unset current context: {}", e))?;
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_success("Context unset");
     Ok(())
 }
 
 /// Rename a context.
 fn op_rename(new_name: &str, old_name: &str, flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     kc.rename_context(new_name, old_name)
         .map_err(|e| format!("{}", e))?;
 
     if flags.dry_run {
-        eprintln!("{} Would rename \"{}\" → \"{}\"", "dry-run:".yellow(), old_name, new_name.cyan());
+        eprintln!(
+            "{} Would rename \"{}\" → \"{}\"",
+            "dry-run:".yellow(),
+            old_name,
+            new_name.cyan()
+        );
         return Ok(());
     }
 
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_success(&format!(
         "Context \"{}\" renamed to \"{}\".",
         old_name, new_name
@@ -383,8 +400,8 @@ fn op_delete(names: &[String], flags: &GlobalFlags) -> Result<(), String> {
         return Err("specify at least one context to delete".into());
     }
 
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     for name in names {
         let target = if name == "." {
@@ -419,25 +436,30 @@ fn op_delete(names: &[String], flags: &GlobalFlags) -> Result<(), String> {
         return Ok(());
     }
 
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     Ok(())
 }
 
 /// Interactive deletion with fzf.
 fn op_delete_interactive() -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let current = kc.get_current_context();
 
-    let selected = fzf::fuzzy_select_streaming(
-        current.as_deref(),
-        || {
-            let kc = kubeconfig::Kubeconfig::load_default().unwrap();
-            kc.get_contexts()
+    let selected = fzf::fuzzy_select_streaming(current.as_deref(), || {
+        let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+        kc.get_contexts()
+    })
+    .ok_or_else(|| "no context selected".to_string())?;
+    op_delete(
+        &[selected],
+        &GlobalFlags {
+            dry_run: false,
+            output_json: false,
+            show_health: false,
         },
     )
-    .ok_or_else(|| "no context selected".to_string())?;
-    op_delete(&[selected], &GlobalFlags { dry_run: false, output_json: false, show_health: false })
 }
 
 /// Start an isolated or read-only shell.
@@ -452,13 +474,10 @@ fn op_shell(target: Option<&str>, readonly: bool) -> Result<(), String> {
             let kc = kubeconfig::Kubeconfig::load_default()
                 .map_err(|e| format!("kubeconfig error: {}", e))?;
             let current = kc.get_current_context();
-            fzf::fuzzy_select_streaming(
-                current.as_deref(),
-                || {
-                    let kc = kubeconfig::Kubeconfig::load_default().unwrap();
-                    kc.get_contexts()
-                },
-            )
+            fzf::fuzzy_select_streaming(current.as_deref(), || {
+                let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+                kc.get_contexts()
+            })
             .ok_or_else(|| "no context selected".to_string())?
         }
     };
@@ -467,8 +486,8 @@ fn op_shell(target: Option<&str>, readonly: bool) -> Result<(), String> {
 
 /// Show context info.
 fn op_info(target: &str) -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     let context = if target == "." {
         kc.get_current_context()
@@ -483,11 +502,15 @@ fn op_info(target: &str) -> Result<(), String> {
 
     let is_current = kc.get_current_context().as_deref() == Some(context.as_str());
 
-    println!("{} {}", "Context:".cyan().bold(), if is_current {
-        format!("{} {}", context, "(current)".green())
-    } else {
-        context.clone()
-    });
+    println!(
+        "{} {}",
+        "Context:".cyan().bold(),
+        if is_current {
+            format!("{} {}", context, "(current)".green())
+        } else {
+            context.clone()
+        }
+    );
     println!("{} {}", "  Cluster:".cyan(), info.cluster);
     if let Some(server) = &info.cluster_server {
         println!("{} {}", "  Server:".cyan(), server);
@@ -506,19 +529,23 @@ fn op_info(target: &str) -> Result<(), String> {
 /// Opens fzf immediately, then loads contexts from kubeconfig in a background
 /// thread (context loading is local file I/O so this is near-instant).
 fn op_interactive_switch() -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let current = kc.get_current_context();
 
-    let selected = fzf::fuzzy_select_streaming(
-        current.as_deref(),
-        || {
-            let kc = kubeconfig::Kubeconfig::load_default().unwrap();
-            kc.get_contexts()
+    let selected = fzf::fuzzy_select_streaming(current.as_deref(), || {
+        let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+        kc.get_contexts()
+    })
+    .ok_or_else(|| "no context selected".to_string())?;
+    op_switch(
+        &selected,
+        &GlobalFlags {
+            dry_run: false,
+            output_json: false,
+            show_health: false,
         },
     )
-    .ok_or_else(|| "no context selected".to_string())?;
-    op_switch(&selected, &GlobalFlags { dry_run: false, output_json: false, show_health: false })
 }
 
 // Simple JSON serialization for --output json (avoid adding serde_json dependency)

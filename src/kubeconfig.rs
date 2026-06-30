@@ -44,7 +44,11 @@ impl KubeconfigFile {
     /// Serialize and save back to disk.
     pub fn save(&self) -> Result<(), KubeconfigError> {
         let yaml = serde_yaml_ng::to_string(&self.document).map_err(|e| {
-            KubeconfigError::Parse(format!("failed to serialize {}: {}", self.path.display(), e))
+            KubeconfigError::Parse(format!(
+                "failed to serialize {}: {}",
+                self.path.display(),
+                e
+            ))
         })?;
         fs::write(&self.path, yaml).map_err(|e| {
             KubeconfigError::Io(format!("failed to write {}: {}", self.path.display(), e))
@@ -331,8 +335,7 @@ fn resolve_kubeconfig_paths() -> Vec<PathBuf> {
     match env::var(KUBECONFIG_ENV) {
         Ok(val) if !val.is_empty() => {
             let mut seen = std::collections::HashSet::new();
-            val
-                .split(separator)
+            val.split(separator)
                 .map(PathBuf::from)
                 .filter(|p| !p.as_os_str().is_empty())
                 .filter(|p| seen.insert(p.clone()))
@@ -365,10 +368,7 @@ fn get_field_str(doc: &Value, field: &str) -> Option<String> {
 /// Set a string field in a YAML mapping.
 fn set_field_str(doc: &mut Value, field: &str, value: &str) {
     if let Value::Mapping(map) = doc {
-        map.insert(
-            Value::String(field.into()),
-            Value::String(value.into()),
-        );
+        map.insert(Value::String(field.into()), Value::String(value.into()));
     }
 }
 
@@ -379,9 +379,7 @@ fn get_context_names(doc: &Value) -> Vec<String> {
         if let Some(Value::Sequence(seq)) = map.get(Value::String("contexts".into())) {
             for entry in seq {
                 if let Value::Mapping(entry_map) = entry {
-                    if let Some(Value::String(name)) =
-                        entry_map.get(Value::String("name".into()))
-                    {
+                    if let Some(Value::String(name)) = entry_map.get(Value::String("name".into())) {
                         names.push(name.clone());
                     }
                 }
@@ -394,9 +392,7 @@ fn get_context_names(doc: &Value) -> Vec<String> {
 /// Remove a context entry by name. Returns true if removed.
 fn remove_context(doc: &mut Value, name: &str) -> bool {
     if let Value::Mapping(map) = doc {
-        if let Some(Value::Sequence(seq)) =
-            map.get_mut(Value::String("contexts".into()))
-        {
+        if let Some(Value::Sequence(seq)) = map.get_mut(Value::String("contexts".into())) {
             let len_before = seq.len();
             seq.retain(|entry| {
                 if let Value::Mapping(entry_map) = entry {
@@ -417,9 +413,7 @@ fn remove_context(doc: &mut Value, name: &str) -> bool {
 /// Rename a context entry. Returns true if renamed.
 fn rename_context_entry(doc: &mut Value, old_name: &str, new_name: &str) -> bool {
     if let Value::Mapping(map) = doc {
-        if let Some(Value::Sequence(seq)) =
-            map.get_mut(Value::String("contexts".into()))
-        {
+        if let Some(Value::Sequence(seq)) = map.get_mut(Value::String("contexts".into())) {
             for entry in seq.iter_mut() {
                 if let Value::Mapping(entry_map) = entry {
                     if entry_map
@@ -427,10 +421,8 @@ fn rename_context_entry(doc: &mut Value, old_name: &str, new_name: &str) -> bool
                         .and_then(|v| v.as_str())
                         == Some(old_name)
                     {
-                        entry_map.insert(
-                            Value::String("name".into()),
-                            Value::String(new_name.into()),
-                        );
+                        entry_map
+                            .insert(Value::String("name".into()), Value::String(new_name.into()));
                         return true;
                     }
                 }
@@ -481,9 +473,7 @@ fn get_all_namespaces_for_context(doc: &Value, context_name: &str) -> Vec<String
                         if let Some(Value::Mapping(ctx_map)) =
                             entry_map.get(Value::String("context".into()))
                         {
-                            if let Some(ns) =
-                                ctx_map.get(Value::String("namespace".into()))
-                            {
+                            if let Some(ns) = ctx_map.get(Value::String("namespace".into())) {
                                 if let Some(s) = ns.as_str() {
                                     namespaces.push(s.to_string());
                                 }
@@ -500,9 +490,7 @@ fn get_all_namespaces_for_context(doc: &Value, context_name: &str) -> Vec<String
 /// Set the namespace for a specific context entry. Returns true if set.
 fn set_context_namespace(doc: &mut Value, context_name: &str, namespace: &str) -> bool {
     if let Value::Mapping(map) = doc {
-        if let Some(Value::Sequence(seq)) =
-            map.get_mut(Value::String("contexts".into()))
-        {
+        if let Some(Value::Sequence(seq)) = map.get_mut(Value::String("contexts".into())) {
             for entry in seq.iter_mut() {
                 if let Value::Mapping(entry_map) = entry {
                     let name = entry_map
@@ -531,9 +519,7 @@ fn set_context_namespace(doc: &mut Value, context_name: &str, namespace: &str) -
 /// Unset the namespace for a specific context entry. Returns true if removed.
 fn unset_context_namespace(doc: &mut Value, context_name: &str) -> bool {
     if let Value::Mapping(map) = doc {
-        if let Some(Value::Sequence(seq)) =
-            map.get_mut(Value::String("contexts".into()))
-        {
+        if let Some(Value::Sequence(seq)) = map.get_mut(Value::String("contexts".into())) {
             for entry in seq.iter_mut() {
                 if let Value::Mapping(entry_map) = entry {
                     let name = entry_map
@@ -595,7 +581,9 @@ fn get_context_info(doc: &Value, context_name: &str) -> Option<ContextInfo> {
                                             if cn == Some(cluster.as_str()) {
                                                 return em
                                                     .get(Value::String("cluster".into()))
-                                                    .and_then(|c| c.get(Value::String("server".into())))
+                                                    .and_then(|c| {
+                                                        c.get(Value::String("server".into()))
+                                                    })
                                                     .and_then(|v| v.as_str())
                                                     .map(|s| s.to_string());
                                             }
@@ -662,7 +650,10 @@ apiVersion: v1
 current-context: minikube
 "#,
         );
-        assert_eq!(get_field_str(&doc, "current-context"), Some("minikube".to_string()));
+        assert_eq!(
+            get_field_str(&doc, "current-context"),
+            Some("minikube".to_string())
+        );
         assert_eq!(get_field_str(&doc, "nonexistent"), None);
     }
 
@@ -675,7 +666,10 @@ current-context: minikube
 "#,
         );
         set_field_str(&mut doc, "current-context", "gke-prod");
-        assert_eq!(get_field_str(&doc, "current-context"), Some("gke-prod".to_string()));
+        assert_eq!(
+            get_field_str(&doc, "current-context"),
+            Some("gke-prod".to_string())
+        );
     }
 
     #[test]
@@ -827,7 +821,9 @@ contexts:
         // Test KUBECONFIG env var mode
         let saved = std::env::var("KUBECONFIG").ok();
         // SAFETY: single-threaded test; we save and restore KUBECONFIG below.
-        unsafe { std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b:/tmp/c"); }
+        unsafe {
+            std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b:/tmp/c");
+        }
         let paths = resolve_kubeconfig_paths();
         assert_eq!(paths.len(), 3);
         assert_eq!(paths[0], std::path::PathBuf::from("/tmp/a"));
@@ -836,7 +832,9 @@ contexts:
 
         // Test default mode (KUBECONFIG unset)
         // SAFETY: single-threaded test; we restore KUBECONFIG below.
-        unsafe { std::env::remove_var("KUBECONFIG"); }
+        unsafe {
+            std::env::remove_var("KUBECONFIG");
+        }
         let paths = resolve_kubeconfig_paths();
         assert!(!paths.is_empty());
         assert!(paths[0].to_string_lossy().contains(".kube"));
@@ -844,7 +842,9 @@ contexts:
         // Restore
         if let Some(v) = saved {
             // SAFETY: single-threaded test; restoring the previously saved value.
-            unsafe { std::env::set_var("KUBECONFIG", v); }
+            unsafe {
+                std::env::set_var("KUBECONFIG", v);
+            }
         }
     }
 }

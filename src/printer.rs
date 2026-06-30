@@ -66,12 +66,20 @@ pub fn print_namespace_list(namespaces: &[String], current: Option<&str>) {
 
 /// Print "Switched to context" message.
 pub fn print_switched_context(ctx: &str) {
-    println!("{} \"{}\"", "Switched to context".green().bold(), ctx.cyan());
+    println!(
+        "{} \"{}\"",
+        "Switched to context".green().bold(),
+        ctx.cyan()
+    );
 }
 
 /// Print "Switched to namespace" message.
 pub fn print_switched_namespace(ns: &str) {
-    println!("{} \"{}\"", "Switched to namespace".green().bold(), ns.cyan());
+    println!(
+        "{} \"{}\"",
+        "Switched to namespace".green().bold(),
+        ns.cyan()
+    );
 }
 
 /// Print an error message.

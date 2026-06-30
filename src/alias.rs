@@ -11,7 +11,7 @@
 //   kubectx -d @prod           → delete alias "prod"
 
 use std::fs;
-use std::io::{self, Write, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
 
 /// Get the path to the aliases file.

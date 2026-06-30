@@ -16,22 +16,22 @@
 //   kubens -h, --help             : show this message
 //   kubens -V, --version          : show version
 
+#[path = "alias.rs"]
+mod alias;
+#[path = "completion.rs"]
+mod completion;
+#[path = "fzf.rs"]
+mod fzf;
+#[path = "health.rs"]
+mod health;
 #[path = "kubeconfig.rs"]
 mod kubeconfig;
 #[path = "printer.rs"]
 mod printer;
-#[path = "fzf.rs"]
-mod fzf;
-#[path = "state.rs"]
-mod state;
-#[path = "alias.rs"]
-mod alias;
-#[path = "health.rs"]
-mod health;
 #[path = "shell.rs"]
 mod shell;
-#[path = "completion.rs"]
-mod completion;
+#[path = "state.rs"]
+mod state;
 
 use std::env;
 use std::process::ExitCode;
@@ -186,8 +186,8 @@ fn run(args: &[String]) -> Result<(), String> {
 /// List all namespaces in the current context.
 /// Queries the live Kubernetes API via kubectl to get the full list of namespaces.
 fn op_list(flags: &GlobalFlags) -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let current_ctx = kc.get_current_context().ok_or_else(|| {
         "no current context set; use kubectx to select a context first".to_string()
     })?;
@@ -264,8 +264,8 @@ fn query_cluster_namespaces() -> Option<Vec<String>> {
 
 /// Show the current namespace.
 fn op_current() -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     match kc.get_current_namespace() {
         Some(ns) => {
             println!("{}", ns);
@@ -277,8 +277,8 @@ fn op_current() -> Result<(), String> {
 
 /// Switch to a namespace.
 fn op_switch(name: &str, flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     // Save current namespace as "previous" before switching
     if let Some(current) = kc.get_current_namespace() {
@@ -298,19 +298,27 @@ fn op_switch(name: &str, flags: &GlobalFlags) -> Result<(), String> {
                     "warning:".yellow(),
                     name
                 );
-                return Err(format!("namespace \"{}\" not found (use --force to override)", name));
+                return Err(format!(
+                    "namespace \"{}\" not found (use --force to override)",
+                    name
+                ));
             }
         }
     }
 
     if flags.dry_run {
-        eprintln!("{} Would switch to namespace \"{}\"", "dry-run:".yellow(), name.cyan());
+        eprintln!(
+            "{} Would switch to namespace \"{}\"",
+            "dry-run:".yellow(),
+            name.cyan()
+        );
         return Ok(());
     }
 
     kc.set_current_namespace(name)
         .map_err(|e| format!("failed to set namespace: {}", e))?;
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_switched_namespace(name);
     Ok(())
 }
@@ -329,8 +337,8 @@ fn op_swap(flags: &GlobalFlags) -> Result<(), String> {
 
 /// Unset the current namespace.
 fn op_unset(flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     if flags.dry_run {
         eprintln!("{} Would unset namespace", "dry-run:".yellow());
@@ -339,15 +347,16 @@ fn op_unset(flags: &GlobalFlags) -> Result<(), String> {
 
     kc.unset_current_namespace()
         .map_err(|e| format!("failed to unset namespace: {}", e))?;
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_success("Namespace unset");
     Ok(())
 }
 
 /// Rename a namespace.
 fn op_rename(new_name: &str, old_name: &str, flags: &GlobalFlags) -> Result<(), String> {
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     let old_name = if old_name == "." {
         kc.get_current_namespace()
@@ -361,13 +370,19 @@ fn op_rename(new_name: &str, old_name: &str, flags: &GlobalFlags) -> Result<(), 
     }
 
     if flags.dry_run {
-        eprintln!("{} Would rename namespace \"{}\" → \"{}\"", "dry-run:".yellow(), old_name, new_name.cyan());
+        eprintln!(
+            "{} Would rename namespace \"{}\" → \"{}\"",
+            "dry-run:".yellow(),
+            old_name,
+            new_name.cyan()
+        );
         return Ok(());
     }
 
     kc.set_current_namespace(new_name)
         .map_err(|e| format!("failed to rename namespace: {}", e))?;
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     printer::print_success(&format!(
         "Namespace \"{}\" renamed to \"{}\".",
         old_name, new_name
@@ -381,8 +396,8 @@ fn op_delete(names: &[String], flags: &GlobalFlags) -> Result<(), String> {
         return Err("specify at least one namespace to delete".into());
     }
 
-    let mut kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let mut kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let current_ns = kc.get_current_namespace();
 
     for name in names {
@@ -411,7 +426,8 @@ fn op_delete(names: &[String], flags: &GlobalFlags) -> Result<(), String> {
         return Ok(());
     }
 
-    kc.save().map_err(|e| format!("failed to save kubeconfig: {}", e))?;
+    kc.save()
+        .map_err(|e| format!("failed to save kubeconfig: {}", e))?;
     Ok(())
 }
 
@@ -419,24 +435,27 @@ fn op_delete(names: &[String], flags: &GlobalFlags) -> Result<(), String> {
 /// Opens fzf immediately, then queries `kubectl get namespaces` in a
 /// background thread. Items stream in as the cluster responds.
 fn op_interactive_switch() -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
     let current = kc.get_current_namespace();
 
-    let selected = fzf::fuzzy_select_streaming(
-        current.as_deref(),
-        || {
-            match query_cluster_namespaces() {
-                Some(ns) if !ns.is_empty() => ns,
-                _ => {
-                    let kc = kubeconfig::Kubeconfig::load_default().unwrap();
-                    kc.get_namespaces()
-                }
+    let selected =
+        fzf::fuzzy_select_streaming(current.as_deref(), || match query_cluster_namespaces() {
+            Some(ns) if !ns.is_empty() => ns,
+            _ => {
+                let kc = kubeconfig::Kubeconfig::load_default().unwrap();
+                kc.get_namespaces()
             }
+        })
+        .ok_or_else(|| "no namespace selected".to_string())?;
+    op_switch(
+        &selected,
+        &GlobalFlags {
+            dry_run: false,
+            output_json: false,
+            force: true,
         },
     )
-    .ok_or_else(|| "no namespace selected".to_string())?;
-    op_switch(&selected, &GlobalFlags { dry_run: false, output_json: false, force: true })
 }
 
 struct JsonEntry {

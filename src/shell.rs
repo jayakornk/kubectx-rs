@@ -22,8 +22,8 @@ use crate::kubeconfig;
 /// Creates a temp kubeconfig with only the target context, sets KUBECONFIG,
 /// and spawns the user's $SHELL. The temp file is cleaned up on exit.
 pub fn start_shell(context: &str, readonly: bool) -> Result<(), String> {
-    let kc = kubeconfig::Kubeconfig::load_default()
-        .map_err(|e| format!("kubeconfig error: {}", e))?;
+    let kc =
+        kubeconfig::Kubeconfig::load_default().map_err(|e| format!("kubeconfig error: {}", e))?;
 
     if !kc.context_exists(context) {
         return Err(format!("no context exists with name \"{}\"", context));
@@ -47,10 +47,17 @@ pub fn start_shell(context: &str, readonly: bool) -> Result<(), String> {
     let mut shell_env: Vec<(String, String)> = Vec::new();
 
     // Set KUBECONFIG to the temp file
-    shell_env.push(("KUBECONFIG".to_string(), kubeconfig_path.to_string_lossy().to_string()));
+    shell_env.push((
+        "KUBECONFIG".to_string(),
+        kubeconfig_path.to_string_lossy().to_string(),
+    ));
 
     // Set a prompt that shows the context name
-    let prompt_prefix = if readonly { format!("{} (ro) ", context) } else { format!("{} ", context) };
+    let prompt_prefix = if readonly {
+        format!("{} (ro) ", context)
+    } else {
+        format!("{} ", context)
+    };
     shell_env.push(("KUBECTX_SHELL_CONTEXT".to_string(), context.to_string()));
     shell_env.push(("PS1".to_string(), format!("[{}] \\w $ ", prompt_prefix)));
 
@@ -104,16 +111,26 @@ exec {1} "$@"
 
     // Print a message about the shell
     if readonly {
-        eprintln!("{} Started read-only shell for context \"{}\". Exit to return.", "→".cyan(), context.cyan());
+        eprintln!(
+            "{} Started read-only shell for context \"{}\". Exit to return.",
+            "→".cyan(),
+            context.cyan()
+        );
     } else {
-        eprintln!("{} Started shell for context \"{}\". Exit to return.", "→".cyan(), context.cyan());
+        eprintln!(
+            "{} Started shell for context \"{}\". Exit to return.",
+            "→".cyan(),
+            context.cyan()
+        );
     }
 
     // Spawn the shell
     let mut cmd = Command::new(&shell);
     cmd.env_clear();
     // Inherit essential env vars
-    for var in &["TERM", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TMP", "TEMP"] {
+    for var in &[
+        "TERM", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TMP", "TEMP",
+    ] {
         if let Ok(val) = env::var(var) {
             cmd.env(var, val);
         }
@@ -129,13 +146,18 @@ exec {1} "$@"
         }
     }
 
-    let status = cmd.status().map_err(|e| format!("failed to spawn shell: {}", e))?;
+    let status = cmd
+        .status()
+        .map_err(|e| format!("failed to spawn shell: {}", e))?;
 
     // Cleanup
     let _ = fs::remove_dir_all(&tmpdir);
 
     if !status.success() {
-        return Err(format!("shell exited with code {}", status.code().unwrap_or(-1)));
+        return Err(format!(
+            "shell exited with code {}",
+            status.code().unwrap_or(-1)
+        ));
     }
 
     Ok(())
@@ -143,22 +165,31 @@ exec {1} "$@"
 
 /// Extract a single context (with its cluster and user) into a standalone
 /// kubeconfig YAML string.
-fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Result<String, String> {
+fn extract_context_kubeconfig(
+    kc: &kubeconfig::Kubeconfig,
+    context: &str,
+) -> Result<String, String> {
     // We need to find the context entry, its cluster, and its user,
     // then build a new kubeconfig with only those entries.
-    let yaml = serde_yaml_ng::to_string(kc.files().first().map(|f| &f.document).ok_or("no kubeconfig files")?)
-        .map_err(|e| format!("failed to serialize: {}", e))?;
+    let yaml = serde_yaml_ng::to_string(
+        kc.files()
+            .first()
+            .map(|f| &f.document)
+            .ok_or("no kubeconfig files")?,
+    )
+    .map_err(|e| format!("failed to serialize: {}", e))?;
 
     // Parse the full kubeconfig
-    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&yaml)
-        .map_err(|e| format!("failed to parse: {}", e))?;
+    let doc: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(&yaml).map_err(|e| format!("failed to parse: {}", e))?;
 
     // Find the context entry
     let contexts = doc.get("contexts").and_then(|v| v.as_sequence());
     let context_entry = contexts
-        .and_then(|seq| seq.iter().find(|e| {
-            e.get("name").and_then(|n| n.as_str()) == Some(context)
-        }))
+        .and_then(|seq| {
+            seq.iter()
+                .find(|e| e.get("name").and_then(|n| n.as_str()) == Some(context))
+        })
         .ok_or_else(|| format!("context \"{}\" not found", context))?;
 
     let cluster_name = context_entry
@@ -197,9 +228,10 @@ fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Res
 
     // Add the matching cluster
     if let Some(clusters) = doc.get("clusters").and_then(|v| v.as_sequence()) {
-        if let Some(cluster_entry) = clusters.iter().find(|e| {
-            e.get("name").and_then(|n| n.as_str()) == Some(cluster_name)
-        }) {
+        if let Some(cluster_entry) = clusters
+            .iter()
+            .find(|e| e.get("name").and_then(|n| n.as_str()) == Some(cluster_name))
+        {
             let mut cluster_seq = serde_yaml_ng::Sequence::new();
             cluster_seq.push(cluster_entry.clone());
             new_doc.insert(
@@ -211,9 +243,10 @@ fn extract_context_kubeconfig(kc: &kubeconfig::Kubeconfig, context: &str) -> Res
 
     // Add the matching user
     if let Some(users) = doc.get("users").and_then(|v| v.as_sequence()) {
-        if let Some(user_entry) = users.iter().find(|e| {
-            e.get("name").and_then(|n| n.as_str()) == Some(user_name)
-        }) {
+        if let Some(user_entry) = users
+            .iter()
+            .find(|e| e.get("name").and_then(|n| n.as_str()) == Some(user_name))
+        {
             let mut user_seq = serde_yaml_ng::Sequence::new();
             user_seq.push(user_entry.clone());
             new_doc.insert(
@@ -252,10 +285,13 @@ fn mktemp_dir() -> io::Result<PathBuf> {
     let tmp = env::temp_dir();
     let mut name = format!("kubectx-shell-");
     name.push_str(&format!("{}", std::process::id()));
-    name.push_str(&format!("-{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0)));
+    name.push_str(&format!(
+        "-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
     let path = tmp.join(name);
     fs::create_dir(&path)?;
     Ok(path)
