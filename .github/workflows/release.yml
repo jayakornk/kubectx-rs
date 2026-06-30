@@ -126,3 +126,64 @@ jobs:
           files: |
             artifacts/*.tar.gz
             artifacts/*.tar.gz.sha256
+
+  tap-bump:
+    name: Bump Homebrew tap formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute source-tarball sha256
+        id: sha
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          URL="https://github.com/jayakornk/kubectx-rs/archive/refs/tags/${TAG}.tar.gz"
+          curl -fsSL "$URL" -o source.tar.gz
+          SHA=$(sha256sum source.tar.gz | awk '{print $1}')
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Computed sha256 for ${TAG}: ${SHA}"
+
+      - name: Checkout homebrew-tap (with PAT)
+        uses: actions/checkout@v4
+        with:
+          repository: jayakornk/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Patch formula url + sha256
+        env:
+          URL: ${{ steps.sha.outputs.url }}
+          SHA256: ${{ steps.sha.outputs.sha256 }}
+        run: |
+          cd tap
+          F=Formula/kubectx-rs.rb
+          sed -i "s|^  url \".*\"|  url \"${URL}\"|" "$F"
+          sed -i "s|^  sha256 \".*\"|  sha256 \"${SHA256}\"|" "$F"
+          echo "=== proposed diff ==="
+          git diff -- "$F"
+
+      - name: Commit + push (only if changed)
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/kubectx-rs.rb
+          if git diff --cached --quiet; then
+            echo "No formula changes (already at ${TAG}); nothing to push."
+          else
+            git commit -m "bump kubectx-rs to ${TAG}"
+            git push
+            echo "Pushed formula bump for ${TAG} to jayakornk/homebrew-tap."
+          fi
