@@ -1,6 +1,6 @@
 [package]
 name = "kubectx-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Faster way to switch between clusters and namespaces in kubectl (Rust port)"
 license = "Apache-2.0"
