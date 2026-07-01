@@ -17,7 +17,7 @@ pub fn print_context_list(contexts: &[String], current: Option<&str>) {
     let mut out = stdout.lock();
     for ctx in contexts {
         if Some(ctx.as_str()) == current {
-            let _ = writeln!(out, "{} {}", "*".yellow().bold(), ctx.cyan().bold());
+            let _ = writeln!(out, "{} {}", "→".green().bold(), ctx.cyan().bold());
         } else {
             let _ = writeln!(out, "  {}", ctx);
         }
@@ -34,7 +34,7 @@ pub fn print_context_list_with_health(
     let mut out = stdout.lock();
     for ctx in contexts {
         let marker = if Some(ctx.as_str()) == current {
-            "*".yellow().bold().to_string()
+            "→".green().bold().to_string()
         } else {
             " ".to_string()
         };
@@ -57,7 +57,7 @@ pub fn print_namespace_list(namespaces: &[String], current: Option<&str>) {
     let mut out = stdout.lock();
     for ns in namespaces {
         if Some(ns.as_str()) == current {
-            let _ = writeln!(out, "{} {}", "*".yellow().bold(), ns.cyan().bold());
+            let _ = writeln!(out, "{} {}", "→".green().bold(), ns.cyan().bold());
         } else {
             let _ = writeln!(out, "  {}", ns);
         }

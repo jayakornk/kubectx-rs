@@ -47,7 +47,9 @@ fn which_fzf() -> Option<String> {
 /// the user can start searching while data is still loading.
 ///
 /// `header` is shown as a static header line in fzf (e.g. "⏳ Loading namespaces…").
-/// `current` highlights the currently-active item with `*`.
+/// `current` highlights the currently-active item in cyan/bold via ANSI
+/// color codes. fzf's `--ansi` flag renders them for display but strips them
+/// from its stdout, so the returned item needs no prefix cleanup.
 /// `loader` runs on a background thread and returns the full list of items.
 ///
 /// Returns the selected item, or None if the user cancelled or fzf failed.
@@ -80,11 +82,12 @@ pub fn fuzzy_select_streaming(
         let mut stdin = stdin;
         for item in &items {
             if Some(item.as_str()) == current_owned.as_deref() {
-                // Highlight the current item
-                let line = format!("{} {}\n", "*".yellow(), item.cyan());
+                // Highlight the current item via ANSI color; fzf's --ansi
+                // flag renders it in display but returns plain text.
+                let line = format!("{}\n", item.cyan().bold());
                 let _ = stdin.write_all(line.as_bytes());
             } else {
-                let _ = stdin.write_all(format!("  {}\n", item).as_bytes());
+                let _ = stdin.write_all(format!("{}\n", item).as_bytes());
             }
         }
         drop(stdin); // EOF — tells fzf the list is complete
@@ -106,6 +109,5 @@ pub fn fuzzy_select_streaming(
     if trimmed.is_empty() {
         return None;
     }
-    // Strip the leading "  " or "* " prefix
-    Some(trimmed.trim_start().to_string())
+    Some(trimmed.to_string())
 }
